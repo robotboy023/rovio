@@ -3,9 +3,11 @@
  * @author Suyash Yeotikar
  * @date Feb 16 2026
  */
-#include "rovio/RovioFilter.hpp"
+#include "CoordinateTransform/FeatureOutputReadable.hpp"
+#include "rovio/CoordinateTransform/FeatureOutput.hpp"
+#include "rovio/CoordinateTransform/PixelOutput.hpp"
 #include "rovio/FilterStates.hpp"
-
+#include "rovio/RovioFilter.hpp"
 #include "rovio_interfaces/msg/health.hpp"
 
 #include <rclcpp/time.hpp>
@@ -14,6 +16,11 @@
 #define ROVIO_HEALTHMONITOR_HPP
 template<unsigned int nMax_, int nLevels_, int patchSize_, int nCam_, int nPose_>
 class HealthMonitor {
+private:
+  rovio::FeatureOutputCT featureOutputTransformer_;
+  rovio::PixelOutputCT pixelOutputTransformer_;
+  rovio::FeatureOutput featureOutput_;
+  rovio::PixelOutput pixelOutput_;
 public:
   typedef rovio::RovioFilter<rovio::FilterState<nMax_,nLevels_,patchSize_,nCam_,nPose_>> mtFilter;
 
@@ -28,7 +35,6 @@ public:
 public:
 
   HealthMonitor();
-
   /**
    * @brief Function to populate the health message for ROVIO.
    * @param filterState shared ptr to current state vector of ROVIO
@@ -108,7 +114,14 @@ public:
    * @param mtFilter &state
    * @return float ratio of number of features below pixel covariance threshold to max features
    */
-  float computePixelCovRatio( const std::shared_ptr<mtFilter> mpFilter_) {}
+  float computePixelCovRatio( const std::shared_ptr<mtFilter> mpFilter_) {
+    auto state = mpFilter_->safe_;
+
+    for (int i = 0 ; i < nMax_; i++ ) {
+
+    }
+
+  }
 
 
   /**

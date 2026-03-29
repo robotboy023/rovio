@@ -56,7 +56,7 @@ class ImgInnovation: public LWF::State<LWF::VectorElement<2>>{
     static_assert(_pix+1==E_,"Error with indices");
     this->template getName<_pix>() = "pix";
   };
-  virtual ~ImgInnovation(){};
+  virtual           ~ImgInnovation(){};
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,6 +174,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   using Base::successfulUpdate_;
   using Base::cancelIteration_;
   using Base::candidateCounter_;
+  using Base::Py_;
   typedef typename Base::mtState mtState;
   typedef typename Base::mtFilterState mtFilterState;
   typedef typename Base::mtInnovation mtInnovation;
@@ -254,6 +255,8 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   mutable Eigen::MatrixXd canditateGenerationDifVec_;
   mutable Eigen::MatrixXd canditateGenerationPy_;
   mutable Eigen::EigenSolver<Eigen::MatrixXd> candidateGenerationES_;
+  mutable std::vector<Eigen::Vector2d> featureInnovations_;
+  mutable std::vector<Eigen::MatrixXd> featureInnovationCovariances_;
 
   mutable MultilevelPatchAlignment<mtState::nLevels_,mtState::patchSize_> alignment_; /**<Patch aligner*/
   mutable cv::Mat drawImg_; /**<Image currently used for drawing*/
@@ -391,6 +394,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   /** \brief Sets the multicamera pointer
    *
    * @param mpMultiCamera - Multicamera pointer
+   * @param mpMultiCamera - Multicamera pointer
    */
   void setCamera(MultiCamera<mtState::nCam_>* mpMultiCamera){
     mpMultiCamera_ = mpMultiCamera;
@@ -411,6 +415,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
       } else {
         y.template get<mtInnovation::_pix>() = noise.template get<mtNoise::_pix>();
     }
+    Eigen::Vector2d innovation = y.template get<mtInnovation::_pix>();
   }
 
   bool generateCandidates(const mtFilterState& filterState, mtState& candidate, int &zeros) const{
@@ -598,7 +603,8 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     filterState.state_.aux().activeFeature_ = 0;
     filterState.state_.aux().activeCameraCounter_ = 0;
 
-
+    featureInnovations_.clear();
+    featureInnovationCovariances_.clear(); // clear the innovation vectors
     /* Detect Image changes by looking at the feature patches between current and previous image (both at the current feature location)
      * The maximum change of intensity is obtained if the pixel is moved along the strongest gradient.
      * The maximal singularvalue, which is equivalent to the root of the larger eigenvalue of the Hessian,
@@ -767,6 +773,17 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     }
   };
 
+  /**
+   * @brief Function to compute the Normalized Innovation squared for each feature
+   * @param Eigen::Vector2d Feature residual
+   * @param Eigen::MatrixXd Covariance matrix for feature residual
+   * @return NIS vector
+   */
+  double computeFeatureNIS(Eigen::Vector2d residual, Eigen::MatrixXd covarainceMat) {
+    double NISScore = `
+  }
+
+
   /** \brief Post-Processing for the image update.
    *
    *  Summary:
@@ -781,7 +798,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   void postProcess(mtFilterState& filterState, const mtMeas& meas, const mtOutlierDetection& outlierDetection, bool& isFinished){
     int& ID = filterState.state_.aux().activeFeature_;  // Get the ID of the updated feature.
     int& activeCamCounter = filterState.state_.aux().activeCameraCounter_;
-
+    computeFeatureNIS();
     if(isFinished){
       commonPostProcess(filterState,meas);
     } else {
@@ -1131,4 +1148,4 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
 }
 
 
-#endif /* ROVIO_IMGUPDATE_HPP_ */
+#endif /* ROVIO_IMGUPDAT
