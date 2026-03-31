@@ -797,6 +797,10 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     int& ID = filterState.state_.aux().activeFeature_;  // Get the ID of the updated feature.
     int& activeCamCounter = filterState.state_.aux().activeCameraCounter_;
     double featureNISScore = computeFeatureNIS(b_red_, Pyinv_);
+    if ( verbose_ ) {
+      std::cout << "Feature ID : " << ID << std::endl;
+      std::cout << "Feature NIS score: " << featureNISScore << std::endl;
+    }
     featureZScores_.push_back(featureNISScore);
 
     if(isFinished){
