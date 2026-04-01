@@ -14,17 +14,18 @@
 
 #ifndef ROVIO_HEALTHMONITOR_HPP
 #define ROVIO_HEALTHMONITOR_HPP
-template<unsigned int nMax_, int nLevels_, int patchSize_, int nCam_, int nPose_>
+template <unsigned int nMax_, int nLevels_, int patchSize_, int nCam_, int nPose_>
 class HealthMonitor {
-private:
-  rovio::FeatureOutputCT featureOutputTransformer_;
-  rovio::PixelOutputCT pixelOutputTransformer_;
-  rovio::FeatureOutput featureOutput_;
-  rovio::PixelOutput pixelOutput_;
 public:
   typedef rovio::RovioFilter<rovio::FilterState<nMax_,nLevels_,patchSize_,nCam_,nPose_>> mtFilter;
   typedef typename mtFilter::mtFilterState mtFilterState;
   typedef typename mtFilterState::mtState mtState;
+private:
+  rovio::TransformFeatureOutputCT<mtState> featureOutputTransformer_;
+  rovio::PixelOutputCT pixelOutputTransformer_;
+  rovio::FeatureOutput featureOutput_;
+  rovio::PixelOutput pixelOutput_;
+public:
   float trackedFeatureRatio; //< Ratio of tracked features to max features
   float validFeatureRatio; //< Ratio of valid features to max features
   float NISZScoreRMSE; //< RMSE of NIS Z-score
@@ -47,20 +48,20 @@ public:
    * @return None
    */
   void populateHealthMsg(const std::shared_ptr<mtFilter> mpFilter_,
-    rovio_interfaces::msg::Health::SharedPtr healthMsg, std::string imu_frame) {
+    rovio_interfaces::msg::Health &healthMsg, std::string imu_frame) {
     if ( !this->healthMsgValid) {
       return;
     }
-    healthMsg->accel_deviation = this->accelDeviation;
-    healthMsg->speed_deviation = this->unhealthyVelocityDeviation;
-    healthMsg->pixel_covariance_ratio = this->pixelCovRatio;
-    healthMsg->accel_deviation = this->accelDeviation;
-    healthMsg->nis_z_score_rmse =  this->NISZScoreRMSE;
-    healthMsg->depth_feature_cov_median = featureDepthCovMedian;
-    healthMsg->tracked_feature_ratio = this->trackedFeatureRatio;
-    healthMsg->total_feature_ratio = this->trackedFeatureRatio;
-    healthMsg->header.frame_id = imu_frame;
-    healthMsg->header.stamp = rclcpp::Time(static_cast<uint64_t>(1e9 * mpFilter_->safe_.t_));
+    healthMsg.accel_deviation = this->accelDeviation;
+    healthMsg.speed_deviation = this->unhealthyVelocityDeviation;
+    healthMsg.pixel_covariance_ratio = this->pixelCovRatio;
+    healthMsg.accel_deviation = this->accelDeviation;
+    healthMsg.nis_z_score_rmse =  this->NISZScoreRMSE;
+    healthMsg.depth_feature_cov_median = featureDepthCovMedian;
+    healthMsg.tracked_feature_ratio = this->trackedFeatureRatio;
+    healthMsg.total_feature_ratio = this->trackedFeatureRatio;
+    healthMsg.header.frame_id = imu_frame;
+    healthMsg.header.stamp = rclcpp::Time(static_cast<uint64_t>(1e9 * mpFilter_->safe_.t_));
   }
 
 
@@ -152,7 +153,7 @@ public:
    * @note There might be a scope of overcounting features in multi-camera case. Investigate later.
    */
   float computePixelCovRatio( const std::shared_ptr<mtFilter> mpFilter_) {
-    auto state = mpFilter_->safe_;
+    auto state = mpFilter_->safe_.state_;
     Eigen::MatrixXd stateCovariance = mpFilter_->safe_.cov_;
     int count = 0;
     for (int i = 0; i < nMax_; i++ ) {
@@ -161,8 +162,8 @@ public:
         featureOutputTransformer_.setFeatureID(i);
         featureOutputTransformer_.setOutputCameraID(camID);
         featureOutputTransformer_.transformState(state, featureOutput_);
-        featureOutputTransformer_.transformCovariance(state, stateCovariance, featureCovariance );
-        Eigen::Vector2d eigValues = featureCovariance.eigenvalues();
+        featureOutputTransformer_.transformCovMat(state, stateCovariance, featureCovariance );
+        Eigen::Vector2d eigValues = featureCovariance.eigenvalues().real();
         double eigValueNorm =  eigValues.norm();
         if (eigValueNorm > pixelCovThreshold ) {
           count++;
@@ -191,7 +192,7 @@ public:
    * @param threshold value of acceleration
    * @param IMU accel reading
    */
-  double computeAccelDeviation(const float thresholdAccel, Eigen::Vector3d IMUAcceleration ) {
+  double computeAccelDeviation(Eigen::Vector3d IMUAcceleration ) {
         double IMUAccelNorm = IMUAcceleration.norm();
         return std::abs(accelThreshold - IMUAccelNorm);
   }

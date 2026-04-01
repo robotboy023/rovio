@@ -168,7 +168,7 @@ class RovioNode : public rclcpp::Node {
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pubMarkers_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pubImuBias_;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pubExtrinsics_[mtState::nCam_];
-  rclcpp::Publisher<rovio_interfaces::msg::Health> healthMonitorPublisher;
+  rclcpp::Publisher<rovio_interfaces::msg::Health>::SharedPtr healthMonitorPublisher;
   std::vector<image_transport::Publisher> imgVisPublishers_;
   geometry_msgs::msg::TransformStamped transformMsg_;
   geometry_msgs::msg::TransformStamped T_J_W_Msg_;
@@ -652,6 +652,7 @@ class RovioNode : public rclcpp::Node {
     std::lock_guard<std::mutex> lock(m_filter_);
     predictionMeas_.template get<mtPredictionMeas::_acc>() = Eigen::Vector3d(imu_msg->linear_acceleration.x,imu_msg->linear_acceleration.y,imu_msg->linear_acceleration.z);
     predictionMeas_.template get<mtPredictionMeas::_gyr>() = Eigen::Vector3d(imu_msg->angular_velocity.x,imu_msg->angular_velocity.y,imu_msg->angular_velocity.z);
+    healthTracker.computeAccelDeviation( predictionMeas_. template get<mtPredictionMeas::_acc>());
     if(init_state_.isInitialized()){
       mpFilter_->addPredictionMeas(predictionMeas_, rclcpp::Time(imu_msg->header.stamp).nanoseconds() * 1e-9);
       updateAndPublish();
@@ -787,26 +788,14 @@ class RovioNode : public rclcpp::Node {
    * @return none
    */
   void computeHealthMessage( std::shared_ptr<mtFilter> mpFilter_) {
-    healthTracker.computeAccelDeviation(mpFilter_);
-    healthTracker.computeUnhealthyVelocityDeviation(mpFilter_);
     healthTracker.computeFeatureDepthCovMedian(mpFilter_);
-    healthTracker.computeNISZScoreRMSE(mpFilter_);
+    healthTracker.computeNISZScoreRMSE(mpImgUpdate_->featureZScores_);
     healthTracker.computePixelCovRatio(mpFilter_);
     healthTracker.computeTrackedFeatureRatio(mpFilter_);
     healthTracker.computeValidFeatureRatio(mpFilter_);
-    healthTracker.populateHealthMsg(healthMonitorMsg);
+    healthTracker.populateHealthMsg(mpFilter_, healthMonitorMsg, imu_frame_);
   }
 
-  /**
-   * @brief Function to publish the populated health monitoring message.
-   * @param None
-   * @return None
-   */
-  void publishHealthMessage(rclcpp::Time msgStamp, std::string frame_id) {
-    healthMonitorMsg.header.stamp = msgStamp;
-    healthMonitorMsg.header.frame_id = frame_id;
-    healthMonitorPublisher.publish(healthMonitorMsg);
-  }
 
   /** \brief Executes the update step of the filter and publishes the updated data.
    */
@@ -930,6 +919,7 @@ class RovioNode : public rclcpp::Node {
           }
           pubOdometry_->publish(odometryMsg_);
         }
+        healthTracker.computeUnhealthyVelocityDeviation(imuOutput_.BvB());
         if(pubPoseWithCovStamped_->get_subscription_count() > 0 || forcePoseWithCovariancePublishing_){
           // Compute covariance of output
           imuOutputCT_.transformCovMat(state,cov,imuOutputCov_);
@@ -1167,7 +1157,7 @@ class RovioNode : public rclcpp::Node {
         gotFirstMessages_ = true;
       }
       computeHealthMessage( mpFilter_);
-      publishHealthMessage( doubleToStamp(mpFilter_->safe_.t_), imu_frame_);
+      healthMonitorPublisher->publish(healthMonitorMsg);
 
     }
   }
