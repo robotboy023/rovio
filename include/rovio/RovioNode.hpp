@@ -61,7 +61,8 @@
 #include "rovio/CoordinateTransform/FeatureOutputReadable.hpp"
 #include "rovio/CoordinateTransform/YprOutput.hpp"
 #include "rovio/CoordinateTransform/LandmarkOutput.hpp"
-
+#include "rovio_interfaces/msg/health.hpp"
+#include "rovio/HealthMonitor.hpp"
 #include <ranges>
 
 namespace rovio {
@@ -140,7 +141,11 @@ class RovioNode : public rclcpp::Node {
   int resize_image_width = 320;
   int resize_image_height = 240;
 
-  // Nodes, Subscriber, Publishers
+  rovio_interfaces::msg::Health healthMonitorMsg;
+  HealthMonitor<mtState::nMax_, mtState::nLevels_, mtState::patchSize_, mtState::nCam_, mtState::nPose_> healthTracker;
+
+
+  // Nodes, Subscriber, Publisherss
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subImu_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subImg0_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subImg1_;
@@ -163,6 +168,7 @@ class RovioNode : public rclcpp::Node {
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pubMarkers_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pubImuBias_;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pubExtrinsics_[mtState::nCam_];
+  rclcpp::Publisher<rovio_interfaces::msg::Health> healthMonitorPublisher;
   std::vector<image_transport::Publisher> imgVisPublishers_;
   geometry_msgs::msg::TransformStamped transformMsg_;
   geometry_msgs::msg::TransformStamped T_J_W_Msg_;
@@ -267,6 +273,7 @@ class RovioNode : public rclcpp::Node {
     pubMarkers_ = this->create_publisher<visualization_msgs::msg::Marker>(
         "rovio/markers", 10);
     pub_T_J_W_transform = this->create_publisher<geometry_msgs::msg::TransformStamped>("rovio/T_J_W",1);
+    healthMonitorPublisher = this->create_publisher<rovio_interfaces::msg::Health>("rovio/health", 1);
     for (int camID = 0; camID < mtState::nCam_; camID++) {
       pubExtrinsics_[camID] =
           this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
@@ -297,6 +304,9 @@ class RovioNode : public rclcpp::Node {
     resize_image_width = readAndDeclareParam<int>("resize_image_width", resize_image_width);
     resize_image_height = readAndDeclareParam<int>("resize_image_height", resize_image_height);
     visFps = readAndDeclareParam<int>("vis_fps", visFps);
+    healthTracker.pixelCovThreshold = readAndDeclareParam<float>("health_tracker_pix_cov_threshold", healthTracker.pixelCovThreshold);
+    healthTracker.accelThreshold = readAndDeclareParam<float>("health_tracker_accel_threshold", healthTracker.accelThreshold);
+    healthTracker.velocityThreshold = readAndDeclareParam<float>("health_tracker_velocity_threshold", healthTracker.velocityThreshold);
     odometryMsg_.header.frame_id = world_frame_;
     odometryMsg_.child_frame_id = imu_frame_;
     msgSeq_ = 1;
@@ -736,10 +746,24 @@ class RovioNode : public rclcpp::Node {
     init_state_.state_ = FilterInitializationState::State::WaitForInitExternalPose;
   }
 
+  /**
+   * @brief Helper function to convert the filter timestamp in double to rclcpp
+   * Time object
+   * @param stamp
+   * @return rclcpp::Time object
+   */
   rclcpp::Time doubleToStamp(double stamp) {
     return rclcpp::Time(static_cast<uint64_t>(stamp));
   }
 
+  /**
+   * @brif=ef Function to publish a transform.
+   * @param translation Translation offset from frame_id to child_frame_id
+   * @param quat rotation offdet from frame_id to child_frame_id
+   * @param frame_id origin frame id
+   * @param stamp destination frame_id
+   * @return bool if transform publishing was sucessful
+   */
   bool sendTransform(Eigen::Vector3d &translation, QPD & quat, std::string frame_id, std::string child_frame_id,
     double stamp) {
     geometry_msgs::msg::TransformStamped transformMsg;
@@ -755,6 +779,33 @@ class RovioNode : public rclcpp::Node {
     transformMsg.transform.rotation.w = -quat.w();
     tb_->sendTransform(transformMsg);
     return true;
+  }
+  /**
+   * @brief Function to compute and populate the healthTracker object fields and
+   * then populate the healthMonitoring msg based on th fields.
+   * @param mpFilter_ current filter state.
+   * @return none
+   */
+  void computeHealthMessage( std::shared_ptr<mtFilter> mpFilter_) {
+    healthTracker.computeAccelDeviation(mpFilter_);
+    healthTracker.computeUnhealthyVelocityDeviation(mpFilter_);
+    healthTracker.computeFeatureDepthCovMedian(mpFilter_);
+    healthTracker.computeNISZScoreRMSE(mpFilter_);
+    healthTracker.computePixelCovRatio(mpFilter_);
+    healthTracker.computeTrackedFeatureRatio(mpFilter_);
+    healthTracker.computeValidFeatureRatio(mpFilter_);
+    healthTracker.populateHealthMsg(healthMonitorMsg);
+  }
+
+  /**
+   * @brief Function to publish the populated health monitoring message.
+   * @param None
+   * @return None
+   */
+  void publishHealthMessage(rclcpp::Time msgStamp, std::string frame_id) {
+    healthMonitorMsg.header.stamp = msgStamp;
+    healthMonitorMsg.header.frame_id = frame_id;
+    healthMonitorPublisher.publish(healthMonitorMsg);
   }
 
   /** \brief Executes the update step of the filter and publishes the updated data.
@@ -1115,6 +1166,9 @@ class RovioNode : public rclcpp::Node {
         }
         gotFirstMessages_ = true;
       }
+      computeHealthMessage( mpFilter_);
+      publishHealthMessage( doubleToStamp(mpFilter_->safe_.t_), imu_frame_);
+
     }
   }
 };

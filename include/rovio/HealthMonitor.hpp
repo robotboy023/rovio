@@ -23,7 +23,8 @@ private:
   rovio::PixelOutput pixelOutput_;
 public:
   typedef rovio::RovioFilter<rovio::FilterState<nMax_,nLevels_,patchSize_,nCam_,nPose_>> mtFilter;
-
+  typedef typename mtFilter::mtFilterState mtFilterState;
+  typedef typename mtFilterState::mtState mtState;
   float trackedFeatureRatio; //< Ratio of tracked features to max features
   float validFeatureRatio; //< Ratio of valid features to max features
   float NISZScoreRMSE; //< RMSE of NIS Z-score
@@ -32,6 +33,10 @@ public:
   float accelDeviation; //< Deviation from the accel threshold
   float pixelCovRatio; //< Ratio of features with pixel covariances above a threshold.
   bool healthMsgValid; //< Boolean variable to control the publishing of the heaalth message.
+
+  float pixelCovThreshold; //< Threshold above which pixel covariance for a feature is considered to be bad.
+  float accelThreshold; //< Threshold above which acceleration value from accelerometer is considered to be bad.
+  float velocityThreshold; //< Threshold above which velocity value estimated by ROVIO os considered to be bad.
 public:
 
   HealthMonitor();
@@ -51,7 +56,7 @@ public:
     healthMsg->pixel_covariance_ratio = this->pixelCovRatio;
     healthMsg->accel_deviation = this->accelDeviation;
     healthMsg->nis_z_score_rmse =  this->NISZScoreRMSE;
-    healthMsg->feature_depth_cov_median = featureDepthCovMedian;
+    healthMsg->depth_feature_cov_median = featureDepthCovMedian;
     healthMsg->tracked_feature_ratio = this->trackedFeatureRatio;
     healthMsg->total_feature_ratio = this->trackedFeatureRatio;
     healthMsg->header.frame_id = imu_frame;
@@ -65,7 +70,28 @@ public:
    * @param state Current state vector of ROVIO
    * @return float value that is the median of the depth covariances
    */
-  float computeFeatureDepthCovMedian(const std::shared_ptr<mtFilter> mpFilter_ ) {}
+  float computeFeatureDepthCovMedian(const std::shared_ptr<mtFilter> mpFilter_ ) {
+    Eigen::MatrixXd stateCovariance;
+    stateCovariance = mpFilter_->safe_.cov_;
+    auto featureManager = mpFilter_->safe_.fsm_;
+    std::vector<double> featureDepthCovariances;
+    for (int i = 0; i < nMax_; i++ ) {
+      if ( featureManager.isValid_[i] ) {
+        double featureDepthCov = stateCovariance(mtState::template getId<mtState::_fea>(i)+2,mtState::template getId<mtState::_fea>(i)+2);
+        featureDepthCovariances.push_back(featureDepthCov);
+      }
+    }
+    int sizeOfVec = featureDepthCovariances.size();
+    if (sizeOfVec == 0 ) return 0;
+    std::nth_element(featureDepthCovariances.begin(), featureDepthCovariances.begin() + sizeOfVec/2 , featureDepthCovariances.end());
+    if (sizeOfVec % 2 !=  0 ) {
+      return static_cast<float>(featureDepthCovariances[sizeOfVec/2]);
+    } else {
+      double val1 = featureDepthCovariances[sizeOfVec/2];
+      double val2 = *std::max_element(featureDepthCovariances.begin(), featureDepthCovariances.begin() + sizeOfVec/2);
+      return static_cast<float>( ( val1 + val2 ) /2);
+    }
+  }
 
   /**
    * @brief Function to compute the valid feature ratio
@@ -107,20 +133,43 @@ public:
    * @param state Current state vector of ROVIO
    * @return float RMSE of NIS zscore
    */
-  float computeNISZScore(const std::shared_ptr<mtFilter> mpFilter_) {}
+  float computeNISZScoreRMSE(const std::vector<double> &featureZScores) {
+    double meanScore = std::accumulate(featureZScores.begin(), featureZScores.end(), 0.0)/ featureZScores.size();
+    double totalDiffSquared = 0.0;
+    for ( double score : featureZScores ) {
+      double diff = score - meanScore;
+      double diffSquared = diff * diff;
+      totalDiffSquared += diffSquared;
+    }
+    double RMSE = sqrt( totalDiffSquared/ featureZScores.size());
+    return static_cast<float>(RMSE);
+  }
 
   /**
    * @brief Function to compute the ratio of features above a pixel covariance threshold
    * @param mtFilter &state
    * @return float ratio of number of features below pixel covariance threshold to max features
+   * @note There might be a scope of overcounting features in multi-camera case. Investigate later.
    */
   float computePixelCovRatio( const std::shared_ptr<mtFilter> mpFilter_) {
     auto state = mpFilter_->safe_;
-
-    for (int i = 0 ; i < nMax_; i++ ) {
-
+    Eigen::MatrixXd stateCovariance = mpFilter_->safe_.cov_;
+    int count = 0;
+    for (int i = 0; i < nMax_; i++ ) {
+      for (int camID = 0; camID < nCam_; camID++) {
+        Eigen::MatrixXd featureCovariance;
+        featureOutputTransformer_.setFeatureID(i);
+        featureOutputTransformer_.setOutputCameraID(camID);
+        featureOutputTransformer_.transformState(state, featureOutput_);
+        featureOutputTransformer_.transformCovariance(state, stateCovariance, featureCovariance );
+        Eigen::Vector2d eigValues = featureCovariance.eigenvalues();
+        double eigValueNorm =  eigValues.norm();
+        if (eigValueNorm > pixelCovThreshold ) {
+          count++;
+        }
+      }
     }
-
+    return static_cast<float>(count) / nMax_;
   }
 
 
@@ -131,9 +180,9 @@ public:
    * @return double difference of velocity and speed
    */
 
-  double computeUnhealthyVelocityDeviation(const float thresholdSpeed, Eigen::Vector3d rovioVelocity) {
+  double computeUnhealthyVelocityDeviation(Eigen::Vector3d rovioVelocity) {
     double velocityNorm = rovioVelocity.norm();
-    return std::abs(thresholdSpeed -  velocityNorm);
+    return std::abs(velocityThreshold -  velocityNorm);
   }
 
   /**
@@ -143,10 +192,10 @@ public:
    * @param IMU accel reading
    */
   double computeAccelDeviation(const float thresholdAccel, Eigen::Vector3d IMUAcceleration ) {
-    double IMUAccelNorm = IMUAcceleration.norm();
-    return std::abs(thresholdAccel - IMUAccelNorm);
+        double IMUAccelNorm = IMUAcceleration.norm();
+        return std::abs(accelThreshold - IMUAccelNorm);
   }
 };
 
-
 #endif // ROVIO_HEALTHMONITOR_HPP
+
