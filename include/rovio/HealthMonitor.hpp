@@ -59,7 +59,7 @@ public:
     healthMsg.nis_z_score_rmse =  this->NISZScoreRMSE;
     healthMsg.depth_feature_cov_median = featureDepthCovMedian;
     healthMsg.tracked_feature_ratio = this->trackedFeatureRatio;
-    healthMsg.total_feature_ratio = this->trackedFeatureRatio;
+    healthMsg.total_feature_ratio = this->validFeatureRatio;
     healthMsg.header.frame_id = imu_frame;
     healthMsg.header.stamp = rclcpp::Time(static_cast<uint64_t>(1e9 * mpFilter_->safe_.t_));
   }
@@ -126,6 +126,7 @@ public:
         }
       }
     }
+    trackedFeatureRatio = static_cast<float>(trackedCount) / nMax_;
     return static_cast<float>(trackedCount) /nMax_;
   }
 
@@ -135,6 +136,9 @@ public:
    * @return float RMSE of NIS zscore
    */
   float computeNISZScoreRMSE(const std::vector<double> &featureZScores) {
+    if ( featureZScores.empty() ) {
+      return 0.0;
+    }
     double meanScore = std::accumulate(featureZScores.begin(), featureZScores.end(), 0.0)/ featureZScores.size();
     double totalDiffSquared = 0.0;
     for ( double score : featureZScores ) {
@@ -156,6 +160,7 @@ public:
     auto state = mpFilter_->safe_.state_;
     Eigen::MatrixXd stateCovariance = mpFilter_->safe_.cov_;
     int count = 0;
+    featureOutputTransformer_.mpMultiCamera_ = &mpFilter_->multiCamera_;
     for (int i = 0; i < nMax_; i++ ) {
       for (int camID = 0; camID < nCam_; camID++) {
         Eigen::MatrixXd featureCovariance;
@@ -197,6 +202,21 @@ public:
         return std::abs(accelThreshold - IMUAccelNorm);
   }
 };
+
+template <unsigned int nMax_, int nLevels_, int patchSize_, int nCam_, int nPose_>
+HealthMonitor<nMax_, nLevels_, patchSize_, nCam_, nPose_>::HealthMonitor()
+  : trackedFeatureRatio(0.0f),
+    validFeatureRatio(0.0f),
+    NISZScoreRMSE(0.0f),
+    featureDepthCovMedian(0.0f),
+    unhealthyVelocityDeviation(0.0f),
+    accelDeviation(0.0f),
+    pixelCovRatio(0.0f),
+    healthMsgValid(false),
+    pixelCovThreshold(0.0f),
+    accelThreshold(0.0f),
+    velocityThreshold(0.0f),
+    featureOutputTransformer_(nullptr){}
 
 #endif // ROVIO_HEALTHMONITOR_HPP
 
