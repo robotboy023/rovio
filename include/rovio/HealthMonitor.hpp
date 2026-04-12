@@ -49,9 +49,9 @@ public:
    */
   void populateHealthMsg(const std::shared_ptr<mtFilter> mpFilter_,
     rovio_interfaces::msg::Health &healthMsg, std::string imu_frame) {
-    if ( !this->healthMsgValid) {
-      return;
-    }
+    // if ( !this->healthMsgValid) {
+    //   return;
+    // }
     healthMsg.accel_deviation = this->accelDeviation;
     healthMsg.speed_deviation = this->unhealthyVelocityDeviation;
     healthMsg.pixel_covariance_ratio = this->pixelCovRatio;
@@ -74,7 +74,7 @@ public:
   float computeFeatureDepthCovMedian(const std::shared_ptr<mtFilter> mpFilter_ ) {
     Eigen::MatrixXd stateCovariance;
     stateCovariance = mpFilter_->safe_.cov_;
-    auto featureManager = mpFilter_->safe_.fsm_;
+    auto &featureManager = mpFilter_->safe_.fsm_;
     std::vector<double> featureDepthCovariances;
     for (int i = 0; i < nMax_; i++ ) {
       if ( featureManager.isValid_[i] ) {
@@ -100,7 +100,7 @@ public:
    * @return float ratio of valid to max features.
    */
   float computeValidFeatureRatio(const std::shared_ptr<mtFilter> mpFilter_) {
-    auto featureManager = mpFilter_->safe_.fsm_;
+    auto &featureManager = mpFilter_->safe_.fsm_;
     int validCount = 0;
     for (int i = 0; i < nMax_; i++ ) {
       if ( featureManager.isValid_[i] ) {
@@ -117,12 +117,14 @@ public:
    * @return float ratio of tracked to max features.
    */
   float computeTrackedFeatureRatio(const std::shared_ptr<mtFilter> mpFilter_) {
-    auto featureManager = mpFilter_->safe_.fsm_;
+    auto &featureManager = mpFilter_->safe_.fsm_;
     int trackedCount = 0;
     for ( int i = 0; i < nMax_; i++ ) {
-      for (int cam = 0; cam < nCam_; cam++ ) {
-        if ( featureManager.features_[i].mpStatistics_->status_[cam] == rovio::TRACKED ) {
-          trackedCount++;
+      if ( featureManager.isValid_[i] && featureManager.features_[i].mpStatistics_ != nullptr ) {
+        for (int cam = 0; cam < nCam_; cam++ ) {
+          if ( featureManager.features_[i].mpStatistics_->status_[cam] == rovio::TRACKED ) {
+            trackedCount++;
+          }
         }
       }
     }
