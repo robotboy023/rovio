@@ -187,6 +187,28 @@ function run_rovio_euroc() {
   done
 }
 
+function run_rovio_euroc_debug() {
+  EUROC_DATASETS_LOCATION=$(pwd)/datasets/machine_hall
+  ROVIO_WS=$(pwd)/install/setup.bash
+  dirList=($(ls ${EUROC_DATASETS_LOCATION}))
+  source $ROVIO_WS
+  for dir in "${dirList[@]}"; do
+    ROS2_BAG_LOCATION=${EUROC_DATASETS_LOCATION}/${dir}/${dir}_ros2/${dir}_ros2.db3
+    ROVIO_OUTPUT_LOCATION=${EUROC_DATASETS_LOCATION}/${dir}/${dir}_ros2/rovio/
+    echo "Deleting prevous rovio output location"
+    rm -rf ${ROVIO_OUTPUT_LOCATION}
+    echo "Processing dataset: ${ROS2_BAG_LOCATION}"
+    if [ -f ${ROS2_BAG_LOCATION} ]; then
+      ros2 launch rovio ros2_rovio_rosbag_loader_launch.yaml rosbag_filename:=$ROS2_BAG_LOCATION  --launch-prefix 'gdb -ex run --args' 
+      wait_for_rovio
+      killall -9 image_view
+    else
+      echo "Skipping dataset: ${dir}, no ros2 bag file found"
+    fi
+  done
+}
+
+
 
 #function to run rovio on euroc datasets using the live verson
 run_rovio_euroc_live() {
