@@ -787,12 +787,12 @@ class RovioNode : public rclcpp::Node {
    * @param mpFilter_ current filter state.
    * @return none
    */
-  void computeHealthMessage( std::shared_ptr<mtFilter> mpFilter_) {
+  void computeHealthMessage( const std::shared_ptr<mtFilter> &mpFilter_) {
     healthTracker.computeFeatureDepthCovMedian(mpFilter_);
     healthTracker.computeNISZScoreRMSE(mpImgUpdate_->featureZScores_);
     healthTracker.computePixelCovRatio(mpFilter_);
-    healthTracker.computeTrackedFeatureRatio(mpFilter_);
     healthTracker.computeValidFeatureRatio(mpFilter_);
+    healthTracker.computeTrackedFeatureRatio(mpFilter_);
     healthTracker.populateHealthMsg(mpFilter_, healthMonitorMsg, imu_frame_);
   }
 
@@ -1155,9 +1155,9 @@ class RovioNode : public rclcpp::Node {
           pubPatch_->publish(patchMsg_);
         }
         gotFirstMessages_ = true;
+        computeHealthMessage( mpFilter_);
+        healthMonitorPublisher->publish(healthMonitorMsg);
       }
-      computeHealthMessage( mpFilter_);
-      healthMonitorPublisher->publish(healthMonitorMsg);
 
     }
   }
