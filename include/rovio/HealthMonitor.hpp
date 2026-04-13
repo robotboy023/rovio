@@ -86,11 +86,13 @@ public:
     if (sizeOfVec == 0 ) return 0;
     std::nth_element(featureDepthCovariances.begin(), featureDepthCovariances.begin() + sizeOfVec/2 , featureDepthCovariances.end());
     if (sizeOfVec % 2 !=  0 ) {
-      return static_cast<float>(featureDepthCovariances[sizeOfVec/2]);
+      this->featureDepthCovMedian = static_cast<float>(featureDepthCovariances[sizeOfVec/2]);
+      return featureDepthCovMedian;
     } else {
       double val1 = featureDepthCovariances[sizeOfVec/2];
       double val2 = *std::max_element(featureDepthCovariances.begin(), featureDepthCovariances.begin() + sizeOfVec/2);
-      return static_cast<float>( ( val1 + val2 ) /2);
+      featureDepthCovMedian = static_cast<float>((val1 + val2)/2);
+      return featureDepthCovMedian;
     }
   }
 
@@ -149,6 +151,7 @@ public:
       totalDiffSquared += diffSquared;
     }
     double RMSE = sqrt( totalDiffSquared/ featureZScores.size());
+    this->NISZScoreRMSE = sqrt(RMSE);
     return static_cast<float>(RMSE);
   }
 
@@ -177,6 +180,7 @@ public:
         }
       }
     }
+    pixelCovRatio = static_cast<float>(count) / nMax_;
     return static_cast<float>(count) / nMax_;
   }
 
@@ -190,7 +194,8 @@ public:
 
   double computeUnhealthyVelocityDeviation(Eigen::Vector3d rovioVelocity) {
     double velocityNorm = rovioVelocity.norm();
-    return std::abs(velocityThreshold -  velocityNorm);
+    unhealthyVelocityDeviation = std::abs(velocityThreshold - velocityNorm);
+    return unhealthyVelocityDeviation;
   }
 
   /**
@@ -201,6 +206,7 @@ public:
    */
   double computeAccelDeviation(Eigen::Vector3d IMUAcceleration ) {
         double IMUAccelNorm = IMUAcceleration.norm();
+        accelDeviation = std::abs(IMUAccelNorm - accelThreshold);
         return std::abs(accelThreshold - IMUAccelNorm);
   }
 };
