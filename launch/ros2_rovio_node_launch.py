@@ -20,7 +20,7 @@ def generate_launch_description():
     cam1_topic_arg = DeclareLaunchArgument('cam1_topic', default_value="/cam1/image_raw")
     resize_image_arg = DeclareLaunchArgument('resize_image', default_value=False)
     resize_image_width_arg = DeclareLaunchArgument('resize_image_width', default_value=320)
-    resize_image_height_arg = DeclareLaunchArgument('reisze_image_height', default_value=240)
+    resize_image_height_arg = DeclareLaunchArgument('resize_image_height', default_value=240)
 
     print("cam1 config: ", cam1_config)
     print("cam0 config: ", cam0_config)

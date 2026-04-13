@@ -44,6 +44,15 @@ launch:
   - arg:
       name: vis_fps
       default: "5"
+  - arg:
+      name: health_tracker_velocity_threshold
+      default: "1.0"
+  - arg:
+      name: health_tracker_accel_threshold
+      default: "0.5"
+  - arg:
+      name: health_tracker_pixel_cov_threshold
+      default: "5.0"
   - node:
       pkg: rovio
       exec: rovio_rosbag_loader
@@ -74,6 +83,12 @@ launch:
           value: "$(var resize_image_height)"
         - name: vis_fps
           value: "$(var vis_fps)"
+        - name: health_tracker_velocity_threshold
+          value: "$(var health_tracker_velocity_threshold)"
+        - name: health_tracker_accel_threshold
+          value: "$(var health_tracker_accel_threshold)"
+        - name: health_tracker_pixel_cov_threshold
+          value: "$(var health_tracker_pixel_cov_threshold)"
   - node:
       pkg: image_view
       exec: image_view
