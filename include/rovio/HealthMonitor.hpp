@@ -14,6 +14,7 @@
 
 #ifndef ROVIO_HEALTHMONITOR_HPP
 #define ROVIO_HEALTHMONITOR_HPP
+
 template <unsigned int nMax_, int nLevels_, int patchSize_, int nCam_, int nPose_>
 class HealthMonitor {
 public:
@@ -25,6 +26,7 @@ private:
   rovio::PixelOutputCT pixelOutputTransformer_;
   rovio::FeatureOutput featureOutput_;
   rovio::PixelOutput pixelOutput_;
+  Eigen::MatrixXd pixelOutputCovariance_;
 public:
   float trackedFeatureRatio; //< Ratio of tracked features to max features
   float validFeatureRatio; //< Ratio of valid features to max features
@@ -38,6 +40,7 @@ public:
   float pixelCovThreshold; //< Threshold above which pixel covariance for a feature is considered to be bad.
   float accelThreshold; //< Threshold above which acceleration value from accelerometer is considered to be bad.
   float velocityThreshold; //< Threshold above which velocity value estimated by ROVIO os considered to be bad.
+
 public:
 
   HealthMonitor();
@@ -135,7 +138,7 @@ public:
   }
 
   /**
-   * @breif Function to compute the RMSE of NIS z-score
+   * @brief Function to compute the RMSE of NIS z-score
    * @param state Current state vector of ROVIO
    * @return float RMSE of NIS zscore
    */
@@ -166,14 +169,21 @@ public:
     Eigen::MatrixXd stateCovariance = mpFilter_->safe_.cov_;
     int count = 0;
     featureOutputTransformer_.mpMultiCamera_ = &mpFilter_->multiCamera_;
+    Eigen::MatrixXd featureCovariance;
+    auto &featureManager = mpFilter_->safe_.fsm_;
     for (int i = 0; i < nMax_; i++ ) {
       for (int camID = 0; camID < nCam_; camID++) {
+        if ( !featureManager.isValid_[i]) {
+          continue;
+        }
         Eigen::MatrixXd featureCovariance;
         featureOutputTransformer_.setFeatureID(i);
         featureOutputTransformer_.setOutputCameraID(camID);
         featureOutputTransformer_.transformState(state, featureOutput_);
         featureOutputTransformer_.transformCovMat(state, stateCovariance, featureCovariance );
-        Eigen::Vector2d eigValues = featureCovariance.eigenvalues().real();
+        pixelOutputTransformer_.transformState(featureOutput_, pixelOutput_);
+        pixelOutputTransformer_.transformCovMat(featureOutput_, featureCovariance, pixelOutputCovariance_);
+        Eigen::Vector2d eigValues = pixelOutputCovariance_.eigenvalues().real();
         double eigValueNorm =  eigValues.norm();
         if (eigValueNorm > pixelCovThreshold ) {
           count++;
