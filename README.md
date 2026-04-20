@@ -195,7 +195,7 @@ To run ROVIO on your custom camera-IMU setup please refer to this [documentation
 - [ ] CI/CD pipeline
 - [x] ROS 2 YAML parameter support
   -  [x] Topics as parameters
-- [ ] TF publishing
+- [x] TF publishing
 - [ ] Reset services
 - [ ] JSON files for config
 
@@ -234,7 +234,8 @@ To run ROVIO on your custom camera-IMU setup please refer to this [documentation
 - [x] TU Delft optimizations
   - [x] Toggle feature selection based on Feature detector score or shi-tomasi score
 - [ ] MAPLAB optimizations
-- [ ] Health monitoring cleanup
+- [x] Custom Health Monitoring msg.
+- [x] STL based health tracking and reset.
 - [ ] ROTVIO
 
 ## Support & Collaboration
