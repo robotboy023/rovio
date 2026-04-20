@@ -787,7 +787,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
    *  Summary:
    *  1. Some drawing tasks.
    *  2. Removal of features with negative depth.
-   *
+   *  3. Adds feature NIS z scores computation for tracked features to a vector. Later used in healthMonitoring class.
    *  @param filterState      - Filter state.
    *  @param meas             - Update measurement.
    *  @param outlierDetection - Outlier detection.
@@ -796,12 +796,6 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   void postProcess(mtFilterState& filterState, const mtMeas& meas, const mtOutlierDetection& outlierDetection, bool& isFinished){
     int& ID = filterState.state_.aux().activeFeature_;  // Get the ID of the updated feature.
     int& activeCamCounter = filterState.state_.aux().activeCameraCounter_;
-    double featureNISScore = computeFeatureNIS(b_red_, Pyinv_);
-    if ( verbose_ ) {
-      std::cout << "Feature ID : " << ID << std::endl;
-      std::cout << "Feature NIS score: " << featureNISScore << std::endl;
-    }
-    featureZScores_.push_back(featureNISScore);
 
     if(isFinished){
       commonPostProcess(filterState,meas);
@@ -848,6 +842,12 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
           if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[camID],featureOutput_.c(),startLevel_,false)){
             f.mpStatistics_->status_[activeCamID] = TRACKED;
             if(doFrameVisualisation_) mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,150+(activeCamID == camID)*105,0));
+            double featureNISScore = computeFeatureNIS(b_red_, Pyinv_);
+            if ( verbose_ ) {
+              std::cout << "Feature ID : " << ID << std::endl;
+              std::cout << "Feature NIS score: " << featureNISScore << std::endl;
+            }
+            featureZScores_.push_back(featureNISScore);
           } else {
             f.mpStatistics_->status_[activeCamID] = FAILED_TRACKING;
             if(doFrameVisualisation_){
