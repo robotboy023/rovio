@@ -52,7 +52,7 @@ launch:
       default: "0.5"
   - arg:
       name: health_tracker_pixel_cov_threshold
-      default: "5.0"
+      default: "10.0"
   - node:
       pkg: rovio
       exec: rovio_rosbag_loader
