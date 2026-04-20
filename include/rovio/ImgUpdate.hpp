@@ -56,7 +56,7 @@ class ImgInnovation: public LWF::State<LWF::VectorElement<2>>{
     static_assert(_pix+1==E_,"Error with indices");
     this->template getName<_pix>() = "pix";
   };
-  virtual ~ImgInnovation(){};
+  virtual           ~ImgInnovation(){};
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,6 +174,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   using Base::successfulUpdate_;
   using Base::cancelIteration_;
   using Base::candidateCounter_;
+  using Base::Pyinv_;
   typedef typename Base::mtState mtState;
   typedef typename Base::mtFilterState mtFilterState;
   typedef typename Base::mtInnovation mtInnovation;
@@ -254,6 +255,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   mutable Eigen::MatrixXd canditateGenerationDifVec_;
   mutable Eigen::MatrixXd canditateGenerationPy_;
   mutable Eigen::EigenSolver<Eigen::MatrixXd> candidateGenerationES_;
+  mutable std::vector<double> featureZScores_;
 
   mutable MultilevelPatchAlignment<mtState::nLevels_,mtState::patchSize_> alignment_; /**<Patch aligner*/
   mutable cv::Mat drawImg_; /**<Image currently used for drawing*/
@@ -391,6 +393,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
   /** \brief Sets the multicamera pointer
    *
    * @param mpMultiCamera - Multicamera pointer
+   * @param mpMultiCamera - Multicamera pointer
    */
   void setCamera(MultiCamera<mtState::nCam_>* mpMultiCamera){
     mpMultiCamera_ = mpMultiCamera;
@@ -411,6 +414,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
       } else {
         y.template get<mtInnovation::_pix>() = noise.template get<mtNoise::_pix>();
     }
+    Eigen::Vector2d innovation = y.template get<mtInnovation::_pix>();
   }
 
   bool generateCandidates(const mtFilterState& filterState, mtState& candidate, int &zeros) const{
@@ -597,8 +601,7 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     }
     filterState.state_.aux().activeFeature_ = 0;
     filterState.state_.aux().activeCameraCounter_ = 0;
-
-
+    featureZScores_.clear();
     /* Detect Image changes by looking at the feature patches between current and previous image (both at the current feature location)
      * The maximum change of intensity is obtained if the pixel is moved along the strongest gradient.
      * The maximal singularvalue, which is equivalent to the root of the larger eigenvalue of the Hessian,
@@ -767,12 +770,24 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
     }
   };
 
+  /**
+   * @brief Function to compute the Normalized Innovation squared for each feature. Same as a zscore for kalman filters.
+   * @param Eigen::Vector2d Feature residual
+   * @param Eigen::MatrixXd Covariance matrix for feature residual
+   * @return double NIS value
+   */
+  double computeFeatureNIS( const Eigen::Vector2d &residual, const Eigen::MatrixXd &covarianceMatInverse) {
+    double NIS = (residual * covarianceMatInverse * residual.transpose())(0,0);
+    return NIS;
+  }
+
+
   /** \brief Post-Processing for the image update.
    *
    *  Summary:
    *  1. Some drawing tasks.
    *  2. Removal of features with negative depth.
-   *
+   *  3. Adds feature NIS z scores computation for tracked features to a vector. Later used in healthMonitoring class.
    *  @param filterState      - Filter state.
    *  @param meas             - Update measurement.
    *  @param outlierDetection - Outlier detection.
@@ -827,6 +842,12 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
           if(mlpTemp1_.isMultilevelPatchInFrame(meas.aux().pyr_[camID],featureOutput_.c(),startLevel_,false)){
             f.mpStatistics_->status_[activeCamID] = TRACKED;
             if(doFrameVisualisation_) mlpTemp1_.drawMultilevelPatchBorder(drawImg_,featureOutput_.c(),1.0,cv::Scalar(0,150+(activeCamID == camID)*105,0));
+            double featureNISScore = computeFeatureNIS(b_red_, Pyinv_);
+            if ( verbose_ ) {
+              std::cout << "Feature ID : " << ID << std::endl;
+              std::cout << "Feature NIS score: " << featureNISScore << std::endl;
+            }
+            featureZScores_.push_back(featureNISScore);
           } else {
             f.mpStatistics_->status_[activeCamID] = FAILED_TRACKING;
             if(doFrameVisualisation_){
@@ -1131,4 +1152,4 @@ ImgOutlierDetection<typename FILTERSTATE::mtState>,false>{
 }
 
 
-#endif /* ROVIO_IMGUPDATE_HPP_ */
+#endif

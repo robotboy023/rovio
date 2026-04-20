@@ -70,6 +70,7 @@ set(ROVIO_SRC
 		src/Camera.cpp
 		src/FeatureCoordinates.cpp
 		src/FeatureDistance.cpp
+		include/rovio/HealthMonitor.hpp
 )
 if(MAKE_SCENE)
 	list(APPEND ROVIO_SRC src/Scene.cpp)

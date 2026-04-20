@@ -265,6 +265,7 @@ int main(int argc, char** argv){
   std::string pcl_topic_name = rovioNode->pubPcl_->get_topic_name();
   std::string u_rays_topic_name = rovioNode->pubMarkers_->get_topic_name();
   std::string patch_topic_name = rovioNode->pubPatch_->get_topic_name();
+  std::string health_topic_name = rovioNode->healthMonitorPublisher->get_topic_name();
 
   topics.push_back(std::string(imu_topic_name));
   topics.push_back(std::string(cam0_topic_name));
@@ -300,7 +301,7 @@ int main(int argc, char** argv){
 
     if(rovioNode->gotFirstMessages_){
       static double lastSafeTime = rovioNode->mpFilter_->safe_.t_;
-      if(rovioNode->mpFilter_->safe_.t_ > lastSafeTime){
+      if(rovioNode->mpFilter_->safe_.t_ > lastSafeTime) {
         if(rovioNode->forceOdometryPublishing_)
         {
           bagOut.write(rovioNode->odometryMsg_, odometry_topic_name, rovioNode->get_clock()->now());
@@ -322,9 +323,10 @@ int main(int argc, char** argv){
         if(rovioNode->forceMarkersPublishing_) {
           bagOut.write(rovioNode->odometryMsg_,odometry_topic_name,rovioNode->get_clock()->now());
         }
-          if(rovioNode->forcePatchPublishing_) {
-            bagOut.write(rovioNode->patchMsg_, patch_topic_name, rovioNode->get_clock()->now());
-          }
+        if(rovioNode->forcePatchPublishing_) {
+          bagOut.write(rovioNode->patchMsg_, patch_topic_name, rovioNode->get_clock()->now());
+        }
+        bagOut.write(rovioNode->healthMonitorMsg, health_topic_name, rovioNode->get_clock()->now());
         lastSafeTime = rovioNode->mpFilter_->safe_.t_;
       }
       if(!isTriggerInitialized){
