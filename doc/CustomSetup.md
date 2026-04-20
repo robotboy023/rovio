@@ -130,7 +130,24 @@ Recommended for low-compute platforms:
 - `useFeatureDetectorScoreSelection true`. Modify in `rovio.info` file. Uses Fast Score for feature selection instead of shi-tomasi score which is computationally expensive. Might notice some degradation in performance and improvement in computational efficiency, less computational peaks.
 ---
 
-## 8. Final Notes
+## 8. Modifying Compilation Optimizations
+
+Compilation optimizations are controlled in `CMakeLists.txt` under the compiler settings block.
+They are recommended settings for Raspberry Pi 5/4 and Raspberry Pi 3 respectively.
+### Current platform-specific flags
+- **ARM 64-bit (`arm64|aarch64`)**
+  - `-march=armv8-a -mtune=cortex-a76 -Ofast -floop-block -floop-interchange -fno-rounding-math -fprefetch-loop-arrays`
+- **ARM 32-bit (`arm`)**
+  - `-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -Ofast -floop-block -floop-interchange -fno-rounding-math -fprefetch-loop-arrays`
+- **Non-ARM**
+  - `-march=native -Ofast -floop-block -floop-interchange -fno-rounding-math -fprefetch-loop-arrays`
+
+Update these flags in `CMakeLists.txt` to match your CPU or toolchain requirements.
+Visit this [url](https://gist.github.com/fm4dd/c663217935dc17f0fc73c9c81b0aa845)
+for additional compilation flags for a custom board.
+---
+
+## 9. Final Notes
 
 - ROVIO is sensitive to timestamping and calibration quality
 - Validate with recorded datasets before deploying on hardware
