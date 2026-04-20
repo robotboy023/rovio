@@ -34,7 +34,6 @@ launch:
   - arg:
       name: resize_image
       default: "false"
-
   - arg:
       name: resize_image_width
       default: "320"
@@ -53,6 +52,19 @@ launch:
   - arg:
       name: health_tracker_pixel_cov_threshold
       default: "10.0"
+  - arg:
+      name: map_frame
+      default: "/map"
+  - arg:
+      name: world_frame
+      default: "/world"
+  - arg:
+      name: camera_frame
+      default: "/camera"
+  - arg:
+      name: imu_frame
+      default: "/imu"
+
   - node:
       pkg: rovio
       exec: rovio_rosbag_loader
@@ -89,6 +101,14 @@ launch:
           value: "$(var health_tracker_accel_threshold)"
         - name: health_tracker_pixel_cov_threshold
           value: "$(var health_tracker_pixel_cov_threshold)"
+        - name: map_frame
+          value: "$(var map_frame)"
+        - name: world_frame
+          value: "$(var world_frame)"
+        - name: camera_frame
+          value: "$(var camera_frame)"
+        - name: imu_frame
+          value: "$(var imu_frame)"
   - node:
       pkg: image_view
       exec: image_view
