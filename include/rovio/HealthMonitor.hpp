@@ -1,4 +1,30 @@
-/** Paste the ETH licence preamble here
+/*
+* Copyright (c) 2026, Suyash Yeotikar
+* All rights reserved.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are met:
+* * Redistributions of source code must retain the above copyright
+* notice, this list of conditions and the following disclaimer.
+* * Redistributions in binary form must reproduce the above copyright
+* notice, this list of conditions and the following disclaimer in the
+* documentation and/or other materials provided with the distribution.
+* * Neither the name of the Autonomous Systems Lab, ETH Zurich nor the
+* names of its contributors may be used to endorse or promote products
+* derived from this software without specific prior written permission.
+*
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+* DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+* FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+* DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+* SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+* CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+/**
  * @file HealthMonitor.hpp
  * @author Suyash Yeotikar
  * @date Feb 16 2026
@@ -62,7 +88,7 @@ public:
     healthMsg.nis_z_score_rmse =  this->NISZScoreRMSE;
     healthMsg.depth_feature_cov_median = featureDepthCovMedian;
     healthMsg.tracked_feature_ratio = this->trackedFeatureRatio;
-    healthMsg.total_feature_ratio = this->validFeatureRatio;
+    healthMsg.valid_feature_ratio = this->validFeatureRatio;
     healthMsg.header.frame_id = imu_frame;
     healthMsg.header.stamp = rclcpp::Time(static_cast<uint64_t>(1e9 * mpFilter_->safe_.t_));
   }
@@ -118,6 +144,7 @@ public:
 
   /**
    * @brief Function to compute the tracked feature ratio.
+   * Feature has to be tracked atleast in 1 camera to be considered to be tracked
    * @param state Current state vector of ROVIO
    * @return float ratio of tracked to max features.
    */
@@ -125,12 +152,15 @@ public:
     auto &featureManager = mpFilter_->safe_.fsm_;
     int trackedCount = 0;
     for ( int i = 0; i < nMax_; i++ ) {
+      bool featureTracked = false;
       if ( featureManager.isValid_[i] && featureManager.features_[i].mpStatistics_ != nullptr ) {
         for (int cam = 0; cam < nCam_; cam++ ) {
-          if ( featureManager.features_[i].mpStatistics_->status_[cam] == rovio::TRACKED ) {
-            trackedCount++;
+          featureTracked = featureTracked || featureManager.features_[i].mpStatistics_->status_[cam] == rovio::TRACKED;
+
           }
         }
+      if ( featureTracked ) {
+        trackedCount++;
       }
     }
     trackedFeatureRatio = static_cast<float>(trackedCount) / nMax_;
@@ -160,6 +190,8 @@ public:
 
   /**
    * @brief Function to compute the ratio of features above a pixel covariance threshold
+   * If pixel covariance is greater than threshold in one camera, it is considered for the count.
+   * Bad pixel covariance even from one camera can corrupt the filter state in update.
    * @param mtFilter &state
    * @return float ratio of number of features below pixel covariance threshold to max features
    * @note There might be a scope of overcounting features in multi-camera case. Investigate later.
@@ -172,6 +204,7 @@ public:
     Eigen::MatrixXd featureCovariance;
     auto &featureManager = mpFilter_->safe_.fsm_;
     for (int i = 0; i < nMax_; i++ ) {
+      bool featureCovarianceAboveThreshold = false;
       for (int camID = 0; camID < nCam_; camID++) {
         if ( !featureManager.isValid_[i]) {
           continue;
@@ -185,10 +218,9 @@ public:
         pixelOutputTransformer_.transformCovMat(featureOutput_, featureCovariance, pixelOutputCovariance_);
         Eigen::Vector2d eigValues = pixelOutputCovariance_.eigenvalues().real();
         double eigValueNorm =  eigValues.norm();
-        if (eigValueNorm > pixelCovThreshold ) {
-          count++;
-        }
+        featureCovarianceAboveThreshold = featureCovarianceAboveThreshold || (eigValueNorm > pixelCovThreshold);
       }
+      if ( featureCovarianceAboveThreshold ) { count++; }
     }
     pixelCovRatio = static_cast<float>(count) / nMax_;
     return static_cast<float>(count) / nMax_;
