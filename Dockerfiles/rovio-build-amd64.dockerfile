@@ -1,21 +1,30 @@
 #Base image
-FROM osrf/ros2:humble
+FROM osrf/ros:humble-desktop-full
 
-#Perform update
+# Perform update and install dependencies
 RUN apt-get update && \
-    apt-get install git && \
-    apt-get install -y build-essential cmake libboost-all-dev libssl-dev libusb-1.0-0-dev
+    apt-get install -y git build-essential cmake bash libboost-all-dev libssl-dev libusb-1.0-0-dev && \
+    apt-get install -y ros-humble-image-view && \
+    rm -rf /var/lib/apt/lists/*
 
-#Build ROVIO ws clone and then build
-RUN mkdir -p ~/rovio_ws/src/ && \
-    git clone git@github.com:suyash023/rovio.git && \
+
+# Kindr installation
+RUN cd ~/ && \
+    git clone "https://github.com/ethz-asl/kindr.git" && \
+    cd kindr && mkdir -p build && cd build && cmake .. && \
+    make install
+
+
+# Build ROVIO ws clone and then build
+RUN /bin/bash -c " mkdir -p ~/rovio_ws/src/ && cd ~/rovio_ws/src/ && \
+    git clone https://github.com/suyash023/rovio.git && \
+    cd ~/rovio_ws/src/rovio && \
     git submodule update --init --recursive && \
-    git clone git@github.com:suyash023/rovio_interfaces.git && \
     cd .. && \
+    git clone https://github.com/suyash023/rovio_interfaces.git && \
+    cd ~/rovio_ws/ && \
     source /opt/ros/humble/setup.bash && \
-    colcon build --symlink-install \
+    colcon build"
 
-# Specify ENTRYPOINT with ~/rovio_ws/install/setup.bash
-ENTRYPOINT [ "bash", "-c",
-    "~/rovio_ws/install/setup.bash",
-    "~/rovio_ws/src/rovio/scripts/rovio_commands.sh" ]
+RUN echo "source /root/rovio_ws/src/rovio/scripts/rovio_commands.sh" >> /etc/bash.bashrc
+    # Specify ENTRYPOINT with setup and commands script
