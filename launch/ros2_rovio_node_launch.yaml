@@ -88,6 +88,12 @@ launch:
           value: "$(var camera_frame)"
         - name: imu_frame
           value: "$(var imu_frame)"
+        - name: cam0_topic
+          value: "$(var cam0_topic)"
+        - name: cam1_topic
+          value: "$(var cam1_topic)"
+        - name: imu_topic
+          value: "$(var imu_topic)"
   - node:
       pkg: image_view
       exec: image_view
