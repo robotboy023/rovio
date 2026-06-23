@@ -231,24 +231,7 @@ class RovioNode : public rclcpp::Node {
     gotFirstMessages_ = false;
 
     // Subscribe topics
-    subImu_ = this->create_subscription<sensor_msgs::msg::Imu>("imu0", 1000,
-      std::bind(&RovioNode::imuCallback, this, std::placeholders::_1));
-    subImg0_ = this->create_subscription<sensor_msgs::msg::Image>("cam0/image_raw", 100,
-              std::bind(&RovioNode::imgCallback0, this, std::placeholders::_1));
-    subImg1_ = this->create_subscription<sensor_msgs::msg::Image>("cam1/image_raw",100,
-                std::bind(&RovioNode::imgCallback1, this, std::placeholders::_1));
-    //subGroundtruth_ =
-    // this->create_subscription<geometry_msgs::msg::PoseStamped>("pose", 1000,
-    //              std::bind(&RovioNode::groundtruthCallback, this,
-    //              std::placeholders::_1));
-    subGroundtruthOdometry_ =
-        this->create_subscription<nav_msgs::msg::Odometry>(
-            "odometry", 1000,
-            std::bind(&RovioNode::groundtruthOdometryCallback, this,
-                      std::placeholders::_1));
-    subVelocity_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
-        "abss/twist", 1000,
-        std::bind(&RovioNode::velocityCallback, this, std::placeholders::_1));
+
 
     srvResetFilter_ = this->create_service<std_srvs::srv::Empty>(
         "rovio/reset",
@@ -300,6 +283,30 @@ class RovioNode : public rclcpp::Node {
     imu_topic = readAndDeclareParam<std::string>("imu_topic", imu_topic);
     cam0_topic = readAndDeclareParam<std::string>("cam0_topic", cam0_topic);
     cam1_topic = readAndDeclareParam<std::string>("cam1_topic", cam1_topic);
+
+    //rclcpp::QoS imuProfile = getQosProfile(imu_topic);
+    rclcpp::QoS imuProfile = rclcpp::QoS(1000).reliability(rclcpp::ReliabilityPolicy::BestEffort);
+    subImu_ = this->create_subscription<sensor_msgs::msg::Imu>(imu_topic, imuProfile,
+     std::bind(&RovioNode::imuCallback, this, std::placeholders::_1));
+    rclcpp::QoS cam0Profile = rclcpp::QoS(100).reliability(rclcpp::ReliabilityPolicy::BestEffort);
+    subImg0_ = this->create_subscription<sensor_msgs::msg::Image>(cam0_topic, cam0Profile,
+              std::bind(&RovioNode::imgCallback0, this, std::placeholders::_1));
+    rclcpp::QoS cam1Profile = rclcpp::QoS(100).reliability(rclcpp::ReliabilityPolicy::BestEffort);;
+    subImg1_ = this->create_subscription<sensor_msgs::msg::Image>(cam1_topic,cam1Profile,
+                std::bind(&RovioNode::imgCallback1, this, std::placeholders::_1));
+    //subGroundtruth_ =
+    // this->create_subscription<geometry_msgs::msg::PoseStamped>("pose", 1000,
+    //              std::bind(&RovioNode::groundtruthCallback, this,
+    //              std::placeholders::_1));
+    subGroundtruthOdometry_ =
+        this->create_subscription<nav_msgs::msg::Odometry>(
+            "odometry", 1000,
+            std::bind(&RovioNode::groundtruthOdometryCallback, this,
+                      std::placeholders::_1));
+    subVelocity_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
+        "abss/twist", 1000,
+        std::bind(&RovioNode::velocityCallback, this, std::placeholders::_1));
+
     resize_image = readAndDeclareParam<bool>("resize_image", resize_image);
     resize_image_width = readAndDeclareParam<int>("resize_image_width", resize_image_width);
     resize_image_height = readAndDeclareParam<int>("resize_image_height", resize_image_height);
@@ -437,6 +444,19 @@ class RovioNode : public rclcpp::Node {
     return value;
   }
 
+  /**
+   * \brief Function to get the qos profile for the specific topic
+   * @param topic name
+   * @return qos type profile.
+   */
+  rclcpp::QoS getQosProfile( std::string topicName ) {
+    std::vector<rclcpp::TopicEndpointInfo> publishers = this->get_publishers_info_by_topic(topicName, false);
+    rclcpp::QoS profile = rclcpp::QoS(rclcpp::KeepLast(10));
+    if (!publishers.empty()) {
+      profile = publishers[0].qos_profile();
+    }
+    return profile;
+  }
 
 
   /** \brief Tests the functionality of the rovio node.
