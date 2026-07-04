@@ -1,21 +1,30 @@
 # Base image for ARM64 architecture
-# Need to verify the base image
-FROM osrf/ros2:humble-ubuntu-jammy-arm64
+FROM  arm64v8/ros:humble
 
 # Perform update and install dependencies
 RUN apt-get update && \
-    apt-get install -y git build-essential cmake libboost-all-dev libssl-dev libusb-1.0-0-dev && \
+    apt-get install -y git build-essential cmake libboost-all-dev libssl-dev libusb-1.0-0-dev unzip wget git && \
+    apt-get install -y ros-humble-image-view ros-humble-cv-bridge libopencv-dev && \
     rm -rf /var/lib/apt/lists/*
 
+# Kindr installation
+RUN cd ~/ && \
+    git clone "https://github.com/ethz-asl/kindr.git" && \
+    cd kindr && mkdir -p build && cd build && cmake .. && \
+    make install
+
 # Build ROVIO ws clone and then build
-RUN mkdir -p ~/rovio_ws/src/ && \
-    git clone https://github.com/suyash023/rovio.git ~/rovio_ws/src/rovio && \
+RUN /bin/bash -c "mkdir -p ~/rovio_ws/src/ && cd ~/rovio_ws/src/ && \
+    git clone https://github.com/suyash023/rovio.git && \
     cd ~/rovio_ws/src/rovio && \
     git submodule update --init --recursive && \
     cd .. && \
-    git clone https://github.com/suyash023/rovio_interfaces.git ~/rovio_ws/src/rovio_interfaces && \
+    git clone https://github.com/suyash023/rovio_interfaces.git && \
+    cd ~/rovio_ws/ && \
     source /opt/ros/humble/setup.bash && \
-    colcon build --symlink-install
+    MAKEFLAGS='-j1' colcon build --parallel-workers 1 --executor sequential"
+
+# Append sourcing script to /etc/bash.bashrc
+RUN echo "source /root/rovio_ws/src/rovio/scripts/rovio_commands.sh" >> /etc/bash.bashrc
 
 # Specify ENTRYPOINT with setup and commands script
-ENTRYPOINT [ "bash", "-c", "source ~/rovio_ws/install/setup.bash && ~/rovio_ws/src/rovio/scripts/rovio_commands.sh" ]
