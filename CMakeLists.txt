@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 project(rovio)
 
+
+# set ROS distro
+set( ROS_DISTRO $ENV{ROS_DISTRO} )
+if( NOT ROS_DISTRO STREQUAL "humble" )
+	add_definitions(-DNOT_HUMBLE)
+endif()
 # Compiler settings
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,6 +32,7 @@ add_definitions(
 		-DROVIO_NLEVELS=${ROVIO_NLEVELS}
 		-DROVIO_PATCHSIZE=${ROVIO_PATCHSIZE}
 		-DROVIO_NPOSE=${ROVIO_NPOSE}
+		-DROS_DISTRO=${ROS_DISTRO}
 )
 
 add_subdirectory(lightweight_filtering)
@@ -72,6 +79,7 @@ set(ROVIO_SRC
 		src/FeatureDistance.cpp
 		include/rovio/HealthMonitor.hpp
 )
+
 if(MAKE_SCENE)
 	list(APPEND ROVIO_SRC src/Scene.cpp)
 endif()

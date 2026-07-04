@@ -30,7 +30,11 @@
 #define FEATURE_TRACKER_HPP_
 
 #include <rclcpp/rclcpp.hpp>
+#ifdef NOT_HUMBLE
 #include <cv_bridge/cv_bridge.hpp>
+#else
+#include <cv_bridge/cv_bridge.h>
+#endif
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include "rovio/MultiCamera.hpp"
