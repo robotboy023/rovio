@@ -13,7 +13,7 @@ RUN cd ~/ && \
     cd kindr && mkdir -p build && cd build && cmake .. && \
     make install
 
-# Build ROVIO ws clone and then build
+# Build ROVIO ws clone and then build in Release mode.
 RUN /bin/bash -c "mkdir -p ~/rovio_ws/src/ && cd ~/rovio_ws/src/ && \
     git clone https://github.com/suyash023/rovio.git && \
     cd ~/rovio_ws/src/rovio && \
@@ -22,7 +22,7 @@ RUN /bin/bash -c "mkdir -p ~/rovio_ws/src/ && cd ~/rovio_ws/src/ && \
     git clone https://github.com/suyash023/rovio_interfaces.git && \
     cd ~/rovio_ws/ && \
     source /opt/ros/humble/setup.bash && \
-    colcon build"
+    colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
 # Append sourcing script to /etc/bash.bashrc
 RUN echo "source /root/rovio_ws/src/rovio/scripts/rovio_commands.sh" >> /etc/bash.bashrc

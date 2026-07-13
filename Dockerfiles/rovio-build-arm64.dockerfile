@@ -22,7 +22,7 @@ RUN /bin/bash -c "mkdir -p ~/rovio_ws/src/ && cd ~/rovio_ws/src/ && \
     git clone https://github.com/suyash023/rovio_interfaces.git && \
     cd ~/rovio_ws/ && \
     source /opt/ros/humble/setup.bash && \
-    MAKEFLAGS='-j1' colcon build --parallel-workers 1 --executor sequential"
+    MAKEFLAGS='-j1' colcon build --parallel-workers 1 --executor sequential --cmake-args -DCMAKE_BUILD_TYPE=Release"
 
 # Append sourcing script to /etc/bash.bashrc
 RUN echo "source /root/rovio_ws/src/rovio/scripts/rovio_commands.sh" >> /etc/bash.bashrc
